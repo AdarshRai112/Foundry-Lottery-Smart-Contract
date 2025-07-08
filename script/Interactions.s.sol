@@ -4,6 +4,7 @@ import {Script,console} from "forge-std/Script.sol";
 import {HelperConfig,CodeConstants} from "./HelperConfig.s.sol";
 import {VRFCoordinatorV2_5Mock} from "@chainlink/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 import {LinkToken} from "test/mocks/LinkToken.sol";
+import {DevOpsTools} from "lib/foundry-devops/src/DevOpsTools.sol";
 contract CreateSubscription is Script{
 
     function createSubscriptionUsingConfig() public returns(uint256,address) {
@@ -30,6 +31,7 @@ contract CreateSubscription is Script{
 
 contract FundSubscription is Script,CodeConstants {
     uint96 public constant FUND_AMOUNT = 3 ether;
+    uint96 public constant FUND_AMOUNT_FOR_MOCK = 70 ether;
     function fundSubscriptionUsingConfig() public {
          HelperConfig helperConfig = new HelperConfig();
         address vrfCordinator = helperConfig.getConfig().vrfCoordinator;
@@ -47,7 +49,7 @@ contract FundSubscription is Script,CodeConstants {
             vm.startBroadcast();
             VRFCoordinatorV2_5Mock(vrfCordinator).fundSubscription(
                 subId,
-                FUND_AMOUNT
+                FUND_AMOUNT_FOR_MOCK
             );
             vm.stopBroadcast();
         }
@@ -63,5 +65,34 @@ contract FundSubscription is Script,CodeConstants {
     }
     function run() external {
         fundSubscriptionUsingConfig();
+    }
+}
+
+contract AddConsumer is Script{
+    function addConsumerUsingConfig(address mostRecentlyDeployedContract) public {
+        HelperConfig helperConfig = new HelperConfig();
+        uint256 subId  = helperConfig.getConfig().subscriptionId;
+        address vrfCoordinator = helperConfig.getConfig().vrfCoordinator;
+        addConsumer(mostRecentlyDeployedContract,vrfCoordinator,subId);
+    } 
+
+    function addConsumer(address mostRecentlyDeployedContract,address vrfCoordinator,uint256 subId) public {
+        console.log("adding consumer contract:", mostRecentlyDeployedContract);
+        console.log("Using VRF Coordinator:", vrfCoordinator);
+        console.log("On Chain Id:", block.chainid);
+        vm.startBroadcast();
+        VRFCoordinatorV2_5Mock(vrfCoordinator).addConsumer(
+            subId,
+            mostRecentlyDeployedContract
+        );
+        vm.stopBroadcast();
+        console.log("Consumer added successfully to subscription ID:", subId);
+    }
+    function run() external {
+        address mostRecentlyDeployedContract = DevOpsTools.get_most_recent_deployment(
+            "Raffle",
+            block.chainid
+        );
+        addConsumerUsingConfig(mostRecentlyDeployedContract);
     }
 }

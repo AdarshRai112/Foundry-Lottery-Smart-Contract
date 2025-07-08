@@ -31,6 +31,7 @@ pragma solidity ^0.8.19;
  */
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import "forge-std/console.sol";
 
 contract Raffle is VRFConsumerBaseV2Plus {
     /**
@@ -41,7 +42,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     error TransferFailed();
     error Raffle__raffleNotOpen();
     error Raffle_UpkeepNeed(uint256 balance,uint256 playersCount,RaffleState raffleState);
-
+    error NoWinnerYet();
     /**
      * Type Declaration
      */
@@ -72,7 +73,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
      */
     event RaffleEntered(address indexed player);
     event  WinnerPicked(address indexed winner);
-
+    event RequestedRaffleWinner(uint256 indexed requestId);
     constructor(
         uint256 entranceFee,
         uint256 interval,
@@ -134,7 +135,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
         return (upkeepNeeded, hex"");
     } 
 
-    function performUpkeep(bytes calldata /*performData*/) external {
+    function performUpkeep(bytes calldata /*performData*/) external returns(uint256 requestId) {
         (bool upkeepNeeded,) = checkUpkeep("");
         if(!upkeepNeeded){
             revert Raffle_UpkeepNeed(address(this).balance,s_players.length,s_raffleState);
@@ -150,7 +151,9 @@ contract Raffle is VRFConsumerBaseV2Plus {
             extraArgs: VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: false}))
         });
 
-         s_vrfCoordinator.requestRandomWords(request);
+         requestId=s_vrfCoordinator.requestRandomWords(request);
+         emit RequestedRaffleWinner(requestId);
+         return requestId;
     }
 
     function fulfillRandomWords(uint256 /*requestId*/, uint256[] calldata randomWords) internal virtual override {
@@ -161,7 +164,6 @@ contract Raffle is VRFConsumerBaseV2Plus {
         s_players = new address payable[](0);
         s_lastTimeStamp = block.timestamp;
         emit WinnerPicked(s_recentWinner);
-        
         (bool success,) = s_recentWinner.call{value: address(this).balance}("");
         if (!success) {
             revert TransferFailed();
@@ -181,5 +183,20 @@ contract Raffle is VRFConsumerBaseV2Plus {
 
     function getPlayer(uint256 indexOfPlayer) external view returns (address) {
         return s_players[indexOfPlayer];
+    }
+
+    function getNumberOfPlayers() external view returns (uint256) {
+        return s_players.length;
+    }
+    
+    function getSubscriptionId() external view returns (uint256) {
+        return i_subscriptionId;
+    }
+
+    function getRecentWinner() external view returns(address){
+        if(s_recentWinner == address(0)){
+            revert NoWinnerYet();
+        }
+        return s_recentWinner;
     }
 }

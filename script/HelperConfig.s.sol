@@ -24,7 +24,7 @@ struct NetworkConfig {
 }
 /*VRF Mock Values*/
 uint96 public constant MOCK_BASE_FEE = 0.25 ether;
-uint96 public constant MOCK_GAS_PRICE_LINK = 1e9;
+uint96 public constant MOCK_GAS_PRICE_LINK = 1e8;
 //LINK /Eth prices
 uint256 public constant MOCK_WEI_PER_UNIT_LINK = 4e15;
 NetworkConfig public localNetworkConfig;
